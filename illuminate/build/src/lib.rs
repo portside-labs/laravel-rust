@@ -70,10 +70,28 @@ impl Discovery {
         write(&dir.join("components.rs"), &self.components(&components));
         write(&dir.join("policies.rs"), &self.policies(&policies));
 
+        let mut watched = Vec::new();
         for path in [&migrations, &seeders, &commands, &components, &policies] {
-            println!("cargo:rerun-if-changed={}", path.display());
+            if let Some(path) = self.watched(path)
+                && !watched.contains(&path)
+            {
+                println!("cargo:rerun-if-changed={}", path.display());
+                watched.push(path);
+            }
         }
         println!("cargo:rerun-if-changed=build.rs");
+    }
+
+    /// The directory to watch for changes to `dir`: the directory itself,
+    /// or — until it exists — its nearest existing parent inside the
+    /// application, so creating it reruns discovery. Cargo treats a missing
+    /// path as always changed, which would rebuild the application on every
+    /// `cargo artisan`; the application's root is never watched, since it
+    /// holds `target`.
+    fn watched<'a>(&self, dir: &'a Path) -> Option<&'a Path> {
+        dir.ancestors()
+            .take_while(|path| *path != self.base)
+            .find(|path| path.is_dir())
     }
 
     /// The generated module for migrations.
@@ -326,6 +344,24 @@ mod tests {
         assert!(generated.contains("pub use post_policy::PostPolicy;"));
         assert!(generated.contains("Gate::policy::<crate::app::models::Post, PostPolicy>"));
         assert!(!generated.contains("Gate::policy::<crate::app::models::Helpers"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn it_watches_the_nearest_existing_directory() {
+        let dir = std::env::temp_dir().join(format!("laravel-build-watched-{}", std::process::id()));
+        let migrations = dir.join("database/migrations");
+        std::fs::create_dir_all(&migrations).unwrap();
+        std::fs::create_dir_all(dir.join("app")).unwrap();
+
+        let discovery = Discovery::new(&dir, &dir);
+
+        assert_eq!(discovery.watched(&migrations), Some(migrations.as_path()));
+        let policies = dir.join("app/policies");
+        assert_eq!(discovery.watched(&policies), Some(dir.join("app").as_path()));
+        let commands = dir.join("app/console/commands");
+        assert_eq!(discovery.watched(&commands), Some(dir.join("app").as_path()));
+        assert_eq!(discovery.watched(&dir.join("missing/directory")), None);
         std::fs::remove_dir_all(&dir).ok();
     }
 }
