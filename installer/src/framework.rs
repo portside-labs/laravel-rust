@@ -3,16 +3,18 @@
 //! An installer built from a local checkout of the framework points new
 //! applications at that checkout (`laravel = { path = "..." }`), so they
 //! build against exactly the code the installer came from — offline, and
-//! with any local changes. When that checkout is gone (or the installer was
-//! built elsewhere), applications depend on the framework's Git repository
-//! instead. `--path=<dir>` picks a checkout explicitly.
+//! with any local changes. When that checkout is gone, or the installer was
+//! installed with `cargo install --git` (as the install script does),
+//! applications depend on the framework's Git repository instead.
+//! `--path=<dir>` picks a checkout explicitly.
 
 use std::path::{Path, PathBuf};
 
 use crate::toml::quote;
 
-/// The framework checkout this installer was built from.
-const BUILT_FROM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+/// The framework checkout this installer was built from: empty when Cargo
+/// downloaded the framework to build it (see build.rs).
+const BUILT_FROM: &str = env!("LARAVEL_FRAMEWORK_CHECKOUT");
 
 /// The framework's repository.
 pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -40,9 +42,9 @@ impl Framework {
             };
         }
 
-        Ok(Path::new(BUILT_FROM)
-            .canonicalize()
-            .ok()
+        Ok(Some(BUILT_FROM)
+            .filter(|built_from| !built_from.is_empty())
+            .and_then(|built_from| Path::new(built_from).canonicalize().ok())
             .filter(|directory| is_framework(directory))
             .map_or_else(|| Framework::Git(REPOSITORY.to_string()), Framework::Path))
     }

@@ -34,7 +34,7 @@ laravel-rust/
 │   └── illuminate-<component>
 ├── packages/<package>/         # first-party packages (laravel/sanctum, ...)
 │   └── laravel-<package>
-├── installer/                  # `laravel new` (laravel/installer), embeds the skeleton
+├── installer/                  # `laravel-rust new` (laravel/installer), embeds the skeleton
 └── skeleton/                   # the application skeleton (laravel/laravel)
 ```
 

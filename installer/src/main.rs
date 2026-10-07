@@ -1,13 +1,15 @@
 //! The Laravel installer, for Rust.
 //!
 //! ```text
-//! cargo install --path installer
-//! laravel new example-app
+//! curl -fsSL https://portsidelabs.io/laravel-rust/install.sh | sh
+//! laravel-rust new example-app
 //! ```
 //!
-//! `laravel new` copies the application skeleton (embedded in this binary at
-//! build time), names the crate after the application, writes its `.env`,
-//! and builds it — so a new application is one command away.
+//! The command is `laravel-rust`, so it sits alongside the PHP installer's
+//! `laravel` command. `laravel-rust new` copies the application skeleton
+//! (embedded in this binary at build time), names the crate after the
+//! application, writes its `.env`, and builds it — so a new application is
+//! one command away.
 
 mod cli;
 // Shared with build.rs, which uses it to decide what to embed.

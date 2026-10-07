@@ -40,20 +40,27 @@ structs, and the compiler checks your work.
 ## Getting started
 
 Install the Laravel installer — the equivalent of `laravel/installer` —
-from your checkout of the framework, then create an application:
+then create an application. The command is `laravel-rust`, so it sits
+alongside the PHP installer's `laravel` command:
 
 ```shell
-cargo install --path installer
-laravel new example-app
+curl -fsSL https://portsidelabs.io/laravel-rust/install.sh | sh
+laravel-rust new example-app
 ```
+
+The install script builds the installer with Cargo, so you'll need Rust 1.89
+or later ([rustup.rs](https://rustup.rs)). It runs `cargo install --git
+https://github.com/portside-labs/laravel-rust laravel-installer`, which you
+can also run yourself. If you're working on the framework itself, install
+from your checkout instead: `cargo install --path installer`.
 
 The installer asks which database you'd like and whether to build your
 frontend assets, then copies the application skeleton (the
 [`skeleton`](../skeleton) directory, the equivalent of `laravel/laravel`),
 writes your `.env` with a fresh application key, builds the application,
-and (for SQLite) runs your migrations. New applications depend on the framework
-checkout the installer was built from (or `--path=<dir>`), falling back to
-the framework's Git repository. Then start your application:
+and (for SQLite) runs your migrations. New applications depend on the
+framework's Git repository, or on the checkout an installer was built from
+(or `--path=<dir>`). Then start your application:
 
 ```shell
 cd example-app

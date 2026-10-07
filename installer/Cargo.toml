@@ -11,7 +11,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "laravel"
+name = "laravel-rust"
 path = "src/main.rs"
 
 [dependencies]

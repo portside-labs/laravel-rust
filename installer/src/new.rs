@@ -1,4 +1,4 @@
-//! `laravel new`: create a new Laravel application.
+//! `laravel-rust new`: create a new Laravel application.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use crate::output::{self, bold, gray, link};
 use crate::prompts::{self, Cancelled};
 use crate::scaffold::{self, Blueprint, DATABASES};
 
-/// Why `laravel new` stopped early.
+/// Why `laravel-rust new` stopped early.
 pub enum Failure {
     /// Something went wrong: shown as an `ERROR` line.
     Error(String),

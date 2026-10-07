@@ -1,6 +1,7 @@
-//! The command line: `laravel new <name> [options]`, `laravel list`,
-//! `laravel help`, and `laravel --version`, parsed the way Symfony Console
-//! parses them (options may appear anywhere, `--` ends them).
+//! The command line: `laravel-rust new <name> [options]`,
+//! `laravel-rust list`, `laravel-rust help`, and `laravel-rust --version`,
+//! parsed the way Symfony Console parses them (options may appear anywhere,
+//! `--` ends them).
 
 use crate::output::{green, yellow};
 
@@ -20,7 +21,7 @@ pub enum Command {
     New(NewOptions),
 }
 
-/// The options of `laravel new`.
+/// The options of `laravel-rust new`.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct NewOptions {
     pub name: Option<String>,
@@ -304,7 +305,7 @@ fn render_options(options: &[&OptionHelp]) -> String {
         .collect()
 }
 
-/// The command list (`laravel`, `laravel list`).
+/// The command list (`laravel-rust`, `laravel-rust list`).
 pub fn list() -> String {
     let width = COMMANDS
         .iter()
@@ -332,7 +333,7 @@ pub fn list() -> String {
     )
 }
 
-/// Help for a command (`laravel help new`, `laravel new --help`).
+/// Help for a command (`laravel-rust help new`, `laravel-rust new --help`).
 pub fn help(command: &str) -> String {
     let (description, usage, arguments, options): (&str, &str, &str, Vec<&OptionHelp>) =
         match command {

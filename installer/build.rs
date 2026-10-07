@@ -1,6 +1,6 @@
 //! Embed the application skeleton (and the framework's `Cargo.lock` and
-//! workspace manifest) into the installer, so `laravel new` works from a
-//! single binary.
+//! workspace manifest) into the installer, so `laravel-rust new` works from
+//! a single binary.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -25,6 +25,17 @@ fn main() {
     );
 
     println!("cargo:rerun-if-changed={}", skeleton.display());
+
+    // New applications may depend on the checkout the installer was built
+    // from (src/framework.rs). A copy Cargo downloaded for `cargo install
+    // --git` (marked with `.cargo-ok`) doesn't count: Cargo cleans those up,
+    // so applications depend on the Git repository instead.
+    let checkout = if root.join(".cargo-ok").exists() {
+        String::new()
+    } else {
+        root.display().to_string()
+    };
+    println!("cargo:rustc-env=LARAVEL_FRAMEWORK_CHECKOUT={checkout}");
 
     let mut files = Vec::new();
     collect(&skeleton, "", &mut files);
