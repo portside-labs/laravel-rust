@@ -625,8 +625,9 @@ debug = 1
         let git = Framework::Git("https://github.com/portside-labs/laravel-rust".into());
         let manifest = super::manifest(SKELETON, WORKSPACE, "podcasts", &git, true).unwrap();
         assert!(
-            manifest
-                .contains("laravel = { git = \"https://github.com/portside-labs/laravel-rust\" }\n")
+            manifest.contains(
+                "laravel = { git = \"https://github.com/portside-labs/laravel-rust\" }\n"
+            )
         );
         assert!(manifest.contains(
             "laravel-build = { git = \"https://github.com/portside-labs/laravel-rust\" }\n"
