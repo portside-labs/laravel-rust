@@ -57,7 +57,7 @@ pub fn web() {
 
 ## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. Nearly all of it applies here: method names are the same in snake case (`whereIn` is `where_in`, `firstOrFail` is `first_or_fail`), facades are still facades, and helpers are still helpers. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the framework is put together.
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. Nearly all of it applies here: method names are the same in snake case (`whereIn` is `where_in`, `firstOrFail` is `first_or_fail`), facades are still facades, and helpers are still helpers. The [guide to Laravel Rust](docs/README.md) tours the differences, and [ARCHITECTURE.md](ARCHITECTURE.md) explains how the framework is put together.
 
 If you're not in the mood to read, [Laracasts](https://laracasts.com) contains thousands of video tutorials covering a range of topics including Laravel, modern PHP, unit testing, JavaScript, and more. Boost the skill level of yourself and your entire team by digging into our comprehensive video library.
 

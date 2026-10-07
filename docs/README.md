@@ -1,4 +1,13 @@
-# Laravel in Rust
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+
+<p align="center">
+<a href="https://laravel.com/docs/13.x"><img src="https://img.shields.io/badge/laravel-13.x-FF2D20" alt="Laravel Version"></a>
+<a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.89%2B-B7410E" alt="Rust Version"></a>
+<a href="../illuminate"><img src="https://img.shields.io/badge/components-35-blue" alt="Components"></a>
+<a href="../LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="License"></a>
+</p>
+
+# Laravel Rust
 
 This guide covers what changes when Laravel is written in Rust: how to start
 an application, a tour of the main components, and what the port includes.
