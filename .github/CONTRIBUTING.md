@@ -1,4 +1,4 @@
-# Laravel in Rust Contribution Guide
+# Laravel Rust Contribution Guide
 
 Thank you for considering contributing! Laravel's own [contribution guide](https://laravel.com/docs/contributions) applies here too: what follows is what's different about working on the port.
 

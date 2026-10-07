@@ -9,7 +9,12 @@
 
 ## About Laravel
 
-> **Note:** This repository contains the core code of the Laravel framework, ported to Rust. It's an unofficial port, not affiliated with Laravel. If you want to build an application using Laravel in Rust, start from the [application skeleton](skeleton).
+> **Note:** This repository contains the core code of the Laravel framework, ported to Rust. It's an unofficial port, not affiliated with Laravel. If you want to build an application using Laravel Rust, install the `laravel-rust` installer and create one from the [application skeleton](skeleton):
+>
+> ```shell
+> curl -fsSL https://portsidelabs.io/laravel-rust/install.sh | sh
+> laravel-rust new example-app
+> ```
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable, creative experience to be truly fulfilling. Laravel attempts to take the pain out of development by easing common tasks used in the majority of web projects, such as:
 
@@ -52,7 +57,7 @@ pub fn web() {
 
 ## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. Nearly all of it applies here: method names are the same in snake case (`whereIn` is `where_in`, `firstOrFail` is `first_or_fail`), facades are still facades, and helpers are still helpers. The [guide to Laravel in Rust](docs/README.md) tours the differences, and [ARCHITECTURE.md](ARCHITECTURE.md) explains how the framework is put together.
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. Nearly all of it applies here: method names are the same in snake case (`whereIn` is `where_in`, `firstOrFail` is `first_or_fail`), facades are still facades, and helpers are still helpers. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the framework is put together.
 
 If you're not in the mood to read, [Laracasts](https://laracasts.com) contains thousands of video tutorials covering a range of topics including Laravel, modern PHP, unit testing, JavaScript, and more. Boost the skill level of yourself and your entire team by digging into our comprehensive video library.
 
@@ -60,7 +65,7 @@ You can also watch bite-sized lessons with real-world projects on [Laravel Learn
 
 ## Contributing
 
-Thank you for considering contributing to Laravel in Rust! The contribution guide can be found in [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+Thank you for considering contributing to Laravel Rust! The contribution guide can be found in [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## Code of Conduct
 
