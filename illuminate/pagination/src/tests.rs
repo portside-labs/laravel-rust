@@ -47,6 +47,38 @@ fn it_appends_query_strings_and_fragments() {
 }
 
 #[test]
+fn it_trims_trailing_slashes_from_the_initial_path() {
+    for (path, expected_path, expected_url) in [
+        ("/users", "/users", "/users?page=2"),
+        ("/users/", "/users", "/users?page=2"),
+        ("/users///", "/users", "/users?page=2"),
+        ("/", "/", "/?page=2"),
+    ] {
+        let options = PaginatorOptions::path(path);
+        let simple = Paginator::new(vec![1, 2], 1, 1, options.clone());
+        let length_aware = LengthAwarePaginator::new(vec![1], 2, 1, 1, options);
+
+        assert_eq!(simple.path(), expected_path);
+        assert_eq!(length_aware.path(), expected_path);
+        assert_eq!(simple.next_page_url().as_deref(), Some(expected_url));
+        assert_eq!(length_aware.next_page_url().as_deref(), Some(expected_url));
+    }
+}
+
+#[test]
+fn it_keeps_paths_explicitly_set_after_construction() {
+    let options = PaginatorOptions::path("/posts");
+    let simple = Paginator::new(vec![1, 2], 1, 1, options.clone()).with_path("/users/");
+    let length_aware = LengthAwarePaginator::new(vec![1], 2, 1, 1, options).with_path("/users/");
+
+    assert_eq!(simple.next_page_url().as_deref(), Some("/users/?page=2"));
+    assert_eq!(
+        length_aware.next_page_url().as_deref(),
+        Some("/users/?page=2")
+    );
+}
+
+#[test]
 fn simple_paginators_know_if_there_are_more_pages() {
     let p = Paginator::new(vec![1, 2, 3], 2, 1, PaginatorOptions::path("/posts"));
     assert!(p.has_more_pages());

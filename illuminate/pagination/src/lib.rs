@@ -77,6 +77,13 @@ impl PaginatorOptions {
         self.page_name = name.into();
         self
     }
+
+    fn with_trimmed_path(mut self) -> Self {
+        if self.path != "/" {
+            self.path.truncate(self.path.trim_end_matches('/').len());
+        }
+        self
+    }
 }
 
 /// Encode a value as JSON indented with four spaces, like PHP's

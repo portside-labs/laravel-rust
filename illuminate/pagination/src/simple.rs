@@ -35,7 +35,7 @@ impl<T> Paginator<T> {
             per_page,
             current_page: current_page.max(1),
             has_more,
-            options,
+            options: options.with_trimmed_path(),
         }
     }
 
