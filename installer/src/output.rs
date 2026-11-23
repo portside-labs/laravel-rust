@@ -49,6 +49,7 @@ pub fn paint(text: impl Display, open: &str, close: &str) -> String {
     }
 }
 
+#[cfg(unix)]
 pub fn red(text: impl Display) -> String {
     paint(text, "31", "39")
 }
@@ -61,6 +62,7 @@ pub fn yellow(text: impl Display) -> String {
     paint(text, "33", "39")
 }
 
+#[cfg(unix)]
 pub fn cyan(text: impl Display) -> String {
     paint(text, "36", "39")
 }
@@ -69,6 +71,7 @@ pub fn gray(text: impl Display) -> String {
     paint(text, "90", "39")
 }
 
+#[cfg(unix)]
 pub fn dim(text: impl Display) -> String {
     paint(text, "2", "22")
 }
@@ -77,6 +80,7 @@ pub fn bold(text: impl Display) -> String {
     paint(text, "1", "22")
 }
 
+#[cfg(unix)]
 pub fn strikethrough(text: impl Display) -> String {
     paint(text, "9", "29")
 }

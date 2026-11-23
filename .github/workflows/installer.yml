@@ -1,0 +1,36 @@
+name: Installer
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup update stable
+      - run: cargo +stable test --locked -p laravel-installer
+      - name: Create and migrate a SQLite application
+        shell: pwsh
+        run: |
+          $workspace = $env:GITHUB_WORKSPACE
+          Set-Location -LiteralPath $env:RUNNER_TEMP
+          cargo +stable run --locked --manifest-path (Join-Path $workspace 'Cargo.toml') -p laravel-installer -- new installer-smoke --path $workspace --no-interaction --no-npm --database=sqlite --no-ansi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Set-Location -LiteralPath installer-smoke
+          $status = cargo +stable artisan migrate:status --no-ansi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $status | Write-Output
+          $report = $status -join "`n"
+          if ($report -notmatch '\bRan\b' -or $report -match '\bPending\b') {
+              throw 'The generated SQLite application has unapplied migrations.'
+          }

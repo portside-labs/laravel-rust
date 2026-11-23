@@ -615,10 +615,11 @@ debug = 1
                 .contains("tokio = { version = \"1\", features = [\"full\", \"test-util\"] }\n")
         );
         assert!(manifest.contains("log = \"0.4\"\n"));
-        assert!(
-            manifest
-                .contains("laravel-build = { path = \"/code/laravel-rust/illuminate/build\" }\n")
-        );
+        let build = Path::new("/code/laravel-rust").join("illuminate/build");
+        assert!(manifest.contains(&format!(
+            "laravel-build = {{ path = {} }}\n",
+            crate::toml::quote(&build.to_string_lossy()),
+        )));
         assert!(manifest.ends_with("\n[profile.dev]\n# Keep debug builds snappy.\ndebug = 1\n"));
         assert!(!manifest.contains("workspace"));
 

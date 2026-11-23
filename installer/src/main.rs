@@ -29,6 +29,7 @@ use std::io::IsTerminal;
 use cli::Command;
 
 fn main() {
+    #[cfg(unix)]
     terminal::install_panic_hook();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();

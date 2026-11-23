@@ -213,18 +213,23 @@ fn execute(display: &str, command: &mut Command) -> Result<bool, std::io::Error>
     Ok(status.success())
 }
 
-/// Find a program on the `PATH`.
-fn which(program: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path)
-            .map(|directory| directory.join(program))
-            .find(|candidate| candidate.is_file())
-    })
+/// Find npm on the `PATH`, including the Windows launcher installed by Node.
+fn find_npm(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let names = ["npm.exe", "npm.cmd", "npm.bat"];
+    #[cfg(not(windows))]
+    let names = ["npm"];
+
+    paths
+        .into_iter()
+        .flat_map(|directory| names.into_iter().map(move |name| directory.join(name)))
+        .find(|candidate| candidate.is_file())
 }
 
 /// `npm install` and `npm run build`.
 fn install_npm_dependencies(directory: &Path) {
-    let Some(npm) = which("npm") else {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let Some(npm) = find_npm(std::env::split_paths(&path)) else {
         output::warn("Unable to find [npm]. Skipping [npm install] and [npm run build]");
         return;
     };
