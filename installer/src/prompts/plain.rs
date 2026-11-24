@@ -3,7 +3,7 @@
 use std::io::{BufRead, Write};
 
 use super::Cancelled;
-use crate::output::{bold, yellow};
+use crate::output::{bold, cyan, dim, yellow};
 
 #[cfg(not(unix))]
 use crate::output;
@@ -48,9 +48,9 @@ fn ask_text(
     placeholder: &str,
     validate: impl Fn(&str) -> Option<String>,
 ) -> Result<String, Cancelled> {
-    writeln!(output, "  {}", bold(label)).map_err(|_| Cancelled)?;
+    writeln!(output, "  {}", cyan(bold(label))).map_err(|_| Cancelled)?;
     if !placeholder.is_empty() {
-        writeln!(output, "  {placeholder}").map_err(|_| Cancelled)?;
+        writeln!(output, "  {}", dim(placeholder)).map_err(|_| Cancelled)?;
     }
     loop {
         let name = answer(input, output)?;
@@ -69,7 +69,13 @@ fn ask_select(
     default: usize,
 ) -> Result<usize, Cancelled> {
     let default_label = options.get(default).ok_or(Cancelled)?;
-    writeln!(output, "  {} [{default_label}]", bold(label)).map_err(|_| Cancelled)?;
+    writeln!(
+        output,
+        "  {} [{}]",
+        cyan(bold(label)),
+        yellow(default_label)
+    )
+    .map_err(|_| Cancelled)?;
     for (index, option) in options.iter().enumerate() {
         writeln!(output, "    [{index}] {option}").map_err(|_| Cancelled)?;
     }
@@ -100,7 +106,13 @@ fn ask_confirm(
     default: bool,
 ) -> Result<bool, Cancelled> {
     let default_label = if default { "yes" } else { "no" };
-    writeln!(output, "  {} (yes/no) [{default_label}]", bold(label)).map_err(|_| Cancelled)?;
+    writeln!(
+        output,
+        "  {} (yes/no) [{}]",
+        cyan(bold(label)),
+        yellow(default_label)
+    )
+    .map_err(|_| Cancelled)?;
     loop {
         match answer(input, output)?.to_ascii_lowercase().as_str() {
             "" => return Ok(default),

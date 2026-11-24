@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Instant;
 
 use crate::cli::NewOptions;
 use crate::framework::Framework;
@@ -128,32 +129,17 @@ pub fn run(options: NewOptions, interactive: bool) -> Result<(), Failure> {
     })
     .map_err(|error| format!("Unable to create the environment file: {error}"))?;
 
-    if npm {
-        install_npm_dependencies(&directory);
-    }
+    let assets_ready = !npm || install_npm_dependencies(&directory);
 
     let built = build(&directory, &name, driver);
 
     // `key:generate` normally sets the key; make sure there is one either way.
     let _ = scaffold::ensure_app_key(&directory);
-    built?;
-
-    output::write(&format!(
-        "{}{}\n",
-        output::margin_top(),
-        output::render_line(
-            "INFO",
-            "37;44",
-            &format!("Application ready in [{name}]. You can start your local development using:")
-        )
-    ));
-    output::line(&format!("{} {}", gray("➜"), bold(format!("cd {name}"))));
-    output::line(&format!("{} {}", gray("➜"), bold("cargo artisan dev")));
-    output::line("");
+    let app_configured = built?;
+    output::application_summary(&name, assets_ready && app_configured);
     output::line(&format!(
-        "  New to Laravel? Check out our {}. {}",
-        link("documentation", "https://laravel.com/docs"),
-        bold("Build something amazing!")
+        "  {}",
+        link("Documentation", "https://laravel.com/docs")
     ));
     output::line("");
 
@@ -205,12 +191,24 @@ fn remove(directory: &Path) -> Result<(), String> {
     removed.map_err(|error| format!("Unable to remove [{}]: {error}", directory.display()))
 }
 
-/// Print a command the way Composer prints the scripts it runs, then run it
-/// with the terminal handed over to it.
-fn execute(display: &str, command: &mut Command) -> Result<bool, std::io::Error> {
-    output::line(&format!("> {display}"));
-    let status = command.status()?;
-    Ok(status.success())
+/// Run a command with the terminal handed over to it and report its result.
+fn execute(
+    description: &str,
+    display: &str,
+    command: &mut Command,
+) -> Result<bool, std::io::Error> {
+    output::write(&format!(
+        "{}  {}\n",
+        output::margin_top(),
+        bold(description)
+    ));
+    output::line(&format!("  {}", gray(format!("> {display}"))));
+    let started = Instant::now();
+    let result = command.status().map(|status| status.success());
+    output::assume_new_lines(1);
+    let status = output::task_result(description, started.elapsed(), matches!(result, Ok(true)));
+    output::line(&format!("  {description} {status}"));
+    result
 }
 
 /// Find npm on the `PATH`, including the Windows launcher installed by Node.
@@ -224,40 +222,49 @@ fn find_npm(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
         .into_iter()
         .flat_map(|directory| names.into_iter().map(move |name| directory.join(name)))
         .find(|candidate| candidate.is_file())
+        .and_then(|candidate| std::path::absolute(candidate).ok())
 }
 
 /// `npm install` and `npm run build`.
-fn install_npm_dependencies(directory: &Path) {
+fn install_npm_dependencies(directory: &Path) -> bool {
     let path = std::env::var_os("PATH").unwrap_or_default();
     let Some(npm) = find_npm(std::env::split_paths(&path)) else {
         output::warn("Unable to find [npm]. Skipping [npm install] and [npm run build]");
-        return;
+        return false;
     };
 
-    output::write(&output::margin_top());
-    for (display, arguments) in [
-        ("npm install", &["install"][..]),
-        ("npm run build", &["run", "build"][..]),
+    for (description, display, arguments) in [
+        (
+            "Installing frontend dependencies",
+            "npm install",
+            &["install"][..],
+        ),
+        (
+            "Building frontend assets",
+            "npm run build",
+            &["run", "build"][..],
+        ),
     ] {
         let succeeded = execute(
+            description,
             display,
             Command::new(&npm).args(arguments).current_dir(directory),
         );
-        output::assume_new_lines(1);
         match succeeded {
             Ok(true) => {}
             Ok(false) => {
                 output::warn(&format!(
                     "[{display}] failed. You can run it again from your application's directory"
                 ));
-                return;
+                return false;
             }
             Err(error) => {
                 output::warn(&format!("Unable to run [{display}]: {error}"));
-                return;
+                return false;
             }
         }
     }
+    true
 }
 
 /// The `cargo` to run: the one running us (when there is one), or the PATH's.
@@ -266,21 +273,20 @@ fn cargo() -> OsString {
 }
 
 /// Build the application, then set its key and (for SQLite) migrate.
-fn build(directory: &Path, name: &str, database: &str) -> Result<(), String> {
+fn build(directory: &Path, name: &str, database: &str) -> Result<bool, String> {
     let (color, ansi) = if output::colors() {
         ("--color=always", "--ansi")
     } else {
         ("--color=never", "--no-ansi")
     };
 
-    output::write(&output::margin_top());
     let built = execute(
+        "Building Artisan",
         "cargo build --bin artisan",
         Command::new(cargo())
             .args(["build", "--bin", "artisan", color])
             .current_dir(directory),
     );
-    output::assume_new_lines(1);
     match built {
         Ok(true) => {}
         Ok(false) => {
@@ -295,28 +301,77 @@ fn build(directory: &Path, name: &str, database: &str) -> Result<(), String> {
         }
     }
 
-    let mut commands = vec![vec!["key:generate", ansi]];
+    let mut commands = vec![("Generating the application key", ["key:generate", ansi])];
     if database == "sqlite" {
-        commands.push(vec!["migrate", "--graceful", ansi]);
+        commands.push(("Running SQLite migrations", ["migrate", ansi]));
     }
 
-    for arguments in commands {
+    let mut configured = true;
+    for (description, arguments) in commands {
         let display = format!("cargo artisan {}", arguments.join(" "));
         let succeeded = execute(
+            description,
             &display,
             Command::new(cargo())
                 .args(["run", "--quiet", "--bin", "artisan", color, "--"])
-                .args(&arguments)
+                .args(arguments)
                 .current_dir(directory),
         );
-        // Artisan's components end with a blank line.
-        output::assume_new_lines(2);
         if !matches!(succeeded, Ok(true)) {
+            configured = false;
             output::warn(&format!(
                 "[{display}] did not succeed. You can run it again from your application's directory"
             ));
         }
     }
 
-    Ok(())
+    Ok(configured)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn npm_uses_the_windows_launcher_from_the_selected_directory() {
+        let mut bytes = [0; 8];
+        getrandom::fill(&mut bytes).unwrap();
+        let root =
+            std::env::temp_dir().join(format!("laravel-npm-{:x}", u64::from_ne_bytes(bytes)));
+        let bin = root.join("bin with spaces");
+        let app = root.join("application");
+        fs::create_dir_all(&bin).unwrap();
+        fs::create_dir(&app).unwrap();
+        fs::write(bin.join("npm"), "#!/bin/sh\n").unwrap();
+        fs::write(bin.join("npm.cmd"), "@echo off\r\n>> npm.log echo %*\r\n").unwrap();
+
+        let npm = find_npm([bin.clone()]).unwrap();
+        assert_eq!(npm, bin.join("npm.cmd"));
+        for arguments in [&["install"][..], &["run", "build"][..]] {
+            assert!(
+                Command::new(&npm)
+                    .args(arguments)
+                    .current_dir(&app)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        let log = app.join("npm.log");
+        assert_eq!(
+            fs::read_to_string(&log)
+                .unwrap()
+                .lines()
+                .collect::<Vec<_>>(),
+            ["install", "run build"]
+        );
+
+        fs::remove_file(log).unwrap();
+        fs::remove_file(bin.join("npm")).unwrap();
+        fs::remove_file(npm).unwrap();
+        fs::remove_dir(app).unwrap();
+        fs::remove_dir(bin).unwrap();
+        fs::remove_dir(root).unwrap();
+    }
 }

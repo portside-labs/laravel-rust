@@ -2,9 +2,9 @@
 //! the question as its title, redrawn in place as keys are pressed, and
 //! collapsed to the answer once it's submitted.
 
+use super::Cancelled;
 use crate::output::{self, cyan, dim, gray, green, paint, red, strikethrough, yellow};
 use crate::terminal::{self, Key, RawMode};
-use super::Cancelled;
 
 /// What a prompt looks like right now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

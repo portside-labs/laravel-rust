@@ -2,37 +2,31 @@
 //! components (`INFO`, `WARN`, `ERROR` lines and `DONE` tasks) you know
 //! from Artisan.
 
-use std::fmt::Display;
+use std::fmt::{Display, Write as _};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::terminal;
 
 static COLORS: AtomicBool = AtomicBool::new(false);
-static TRUECOLOR: AtomicBool = AtomicBool::new(true);
 
 /// How many newlines the output currently ends with (Symfony starts at 1).
 static NEW_LINES: AtomicUsize = AtomicUsize::new(1);
 
-/// The Laravel logo, as printed by `laravel/installer`.
-pub const LOGO: [&str; 6] = [
-    "██╗      █████╗ ██████╗  █████╗ ██╗   ██╗███████╗██╗",
-    "██║     ██╔══██╗██╔══██╗██╔══██╗██║   ██║██╔════╝██║",
-    "██║     ███████║██████╔╝███████║██║   ██║█████╗  ██║",
-    "██║     ██╔══██║██╔══██╗██╔══██║╚██╗ ██╔╝██╔══╝  ██║",
-    "███████╗██║  ██║██║  ██║██║  ██║ ╚████╔╝ ███████╗███████╗",
-    "╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝",
+const LARAVEL_WORDMARK: [&str; 6] = [
+    "██╗       █████╗  ██████╗   █████╗  ██╗   ██╗ ███████╗ ██╗",
+    "██║      ██╔══██╗ ██╔══██╗ ██╔══██╗ ██║   ██║ ██╔════╝ ██║",
+    "██║      ███████║ ██████╔╝ ███████║ ██║   ██║ █████╗   ██║",
+    "██║      ██╔══██║ ██╔══██╗ ██╔══██║ ╚██╗ ██╔╝ ██╔══╝   ██║",
+    "███████╗ ██║  ██║ ██║  ██║ ██║  ██║  ╚████╔╝  ███████╗ ███████╗",
+    "╚══════╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝   ╚═══╝   ╚══════╝ ╚══════╝",
 ];
+const BANNER_COLORS: [u8; LARAVEL_WORDMARK.len()] = [209, 203, 202, 208, 214, 215];
 
 /// Turn colors on or off for everything written from now on.
 pub fn set_colors(enabled: bool) {
     COLORS.store(enabled, Ordering::Relaxed);
-    // Apple's Terminal only learned 24-bit color recently; give it the
-    // closest 256-color red instead.
-    let apple_terminal =
-        std::env::var("TERM_PROGRAM").is_ok_and(|program| program == "Apple_Terminal");
-    TRUECOLOR.store(!apple_terminal, Ordering::Relaxed);
 }
 
 /// Determine whether colors are on.
@@ -62,7 +56,6 @@ pub fn yellow(text: impl Display) -> String {
     paint(text, "33", "39")
 }
 
-#[cfg(unix)]
 pub fn cyan(text: impl Display) -> String {
     paint(text, "36", "39")
 }
@@ -71,7 +64,6 @@ pub fn gray(text: impl Display) -> String {
     paint(text, "90", "39")
 }
 
-#[cfg(unix)]
 pub fn dim(text: impl Display) -> String {
     paint(text, "2", "22")
 }
@@ -85,21 +77,12 @@ pub fn strikethrough(text: impl Display) -> String {
     paint(text, "9", "29")
 }
 
-/// Laravel red: `#FF2D20`.
-pub fn laravel_red(text: impl Display) -> String {
-    if TRUECOLOR.load(Ordering::Relaxed) {
-        paint(text, "38;2;255;45;32", "39")
-    } else {
-        paint(text, "38;5;196", "39")
-    }
-}
-
-/// A terminal hyperlink (OSC 8), falling back to the plain text.
+/// A terminal hyperlink (OSC 8), falling back to the plain URL.
 pub fn link(text: &str, url: &str) -> String {
     if colors() {
         format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
     } else {
-        text.to_string()
+        url.to_string()
     }
 }
 
@@ -161,14 +144,75 @@ pub fn margin_top() -> String {
     "\n".repeat(2usize.saturating_sub(new_lines_written()))
 }
 
-/// Print the Laravel logo, with a blank line above and below it.
+/// Introduce Laravel Rust, using a compact banner in narrow terminals and logs.
 pub fn logo() {
-    let mut rendered = margin_top();
-    for row in LOGO {
-        rendered.push_str(&format!("  {}\n", laravel_red(row)));
+    write(&format!(
+        "{}{}\n",
+        margin_top(),
+        render_banner(terminal::width(), colors())
+    ));
+}
+
+fn render_banner(columns: usize, decorated: bool) -> String {
+    let title = bold("Laravel Rust");
+    if !decorated
+        || LARAVEL_WORDMARK
+            .iter()
+            .any(|row| row.chars().count() + 2 >= columns)
+    {
+        return format!("  {title}\n");
     }
-    rendered.push('\n');
-    write(&rendered);
+
+    let mut banner = String::new();
+    for (row, color) in LARAVEL_WORDMARK.into_iter().zip(BANNER_COLORS) {
+        writeln!(banner, "  {}", paint(row, &format!("38;5;{color}"), "39")).unwrap();
+    }
+    writeln!(banner, "  {title}").unwrap();
+    banner
+}
+
+/// Show the new application's location and the commands to start it.
+pub fn application_summary(name: &str, complete: bool) {
+    write(&format!(
+        "{}{}\n",
+        margin_top(),
+        render_summary(name, complete, terminal::width(), colors())
+    ));
+}
+
+fn render_summary(name: &str, complete: bool, columns: usize, decorated: bool) -> String {
+    let title = if complete {
+        "Application ready"
+    } else {
+        "Application created"
+    };
+    let details = [
+        format!("Path  ./{name}"),
+        format!("cd {name}"),
+        "cargo artisan dev".into(),
+    ];
+    let length = |text: &str| text.chars().count();
+    let width = details
+        .iter()
+        .map(|line| length(line))
+        .max()
+        .unwrap_or(0)
+        .max(length(title) + 3);
+    let heading = if complete {
+        green(bold(title))
+    } else {
+        yellow(bold(title))
+    };
+    if !decorated || width + 6 > columns {
+        return format!("  {heading}\n    {}\n", details.join("\n    "));
+    }
+
+    let mut summary = format!("  ┌ {heading} {}┐\n", "─".repeat(width - length(title)));
+    for detail in details {
+        writeln!(summary, "  │ {detail:width$} │").unwrap();
+    }
+    writeln!(summary, "  └{}┘", "─".repeat(width + 2)).unwrap();
+    summary
 }
 
 /// Highlight `[dynamic content]` in bold, like Laravel's components.
@@ -236,25 +280,25 @@ pub fn task<T, E>(description: &str, callback: impl FnOnce() -> Result<T, E>) ->
     write(&format!("  {description} "));
     let started = Instant::now();
     let result = callback();
-    let runtime = format!(" {}", runtime_for_humans(started));
-
-    let width = terminal::width().min(150);
-    let dots = width.saturating_sub(description.chars().count() + runtime.chars().count() + 10);
-    let status = if result.is_ok() {
-        paint(bold("DONE"), "32", "39")
-    } else {
-        paint(bold("FAIL"), "31", "39")
-    };
-    line(&format!(
-        "{}{} {status}",
-        gray(".".repeat(dots)),
-        gray(runtime)
-    ));
+    line(&task_result(description, started.elapsed(), result.is_ok()));
     result
 }
 
-fn runtime_for_humans(started: Instant) -> String {
-    let milliseconds = started.elapsed().as_secs_f64() * 1000.0;
+/// The time and final status of a task, aligned to the terminal's width.
+pub fn task_result(description: &str, elapsed: Duration, succeeded: bool) -> String {
+    let runtime = runtime_for_humans(elapsed);
+    let width = terminal::width().min(150);
+    let dots = width.saturating_sub(description.chars().count() + runtime.len() + 10);
+    let status = if succeeded {
+        green(bold("DONE"))
+    } else {
+        paint(bold("FAIL"), "31", "39")
+    };
+    format!("{} {} {status}", gray(".".repeat(dots)), gray(runtime))
+}
+
+fn runtime_for_humans(elapsed: Duration) -> String {
+    let milliseconds = elapsed.as_secs_f64() * 1000.0;
     if milliseconds < 1000.0 {
         format!("{milliseconds:.2}ms")
     } else {
@@ -292,8 +336,30 @@ mod tests {
     }
 
     #[test]
-    fn the_logo_spells_laravel() {
-        let widths: Vec<usize> = LOGO.iter().map(|row| row.chars().count()).collect();
-        assert_eq!(widths, [52, 52, 52, 52, 57, 57]);
+    fn the_banner_fits_narrow_and_plain_terminals() {
+        assert_eq!(render_banner(50, true), "  Laravel Rust\n");
+        assert_eq!(render_banner(80, false), "  Laravel Rust\n");
+        let banner = render_banner(80, true);
+        assert!(banner.starts_with("  ██╗       █████╗"));
+        assert!(banner.ends_with("  Laravel Rust\n"));
+        assert!(banner.lines().all(|line| line.chars().count() < 80));
+        assert_eq!(banner.lines().count(), 7);
+    }
+
+    #[test]
+    fn the_summary_keeps_commands_readable_in_each_layout() {
+        let wide = render_summary("podcasts", true, 80, true);
+        assert!(wide.starts_with("  ┌ Application ready "));
+        assert!(wide.contains("cd podcasts"));
+        assert!(wide.contains("cargo artisan dev"));
+        assert!(
+            wide.lines()
+                .all(|line| line.chars().count() == wide.lines().next().unwrap().chars().count())
+        );
+
+        let narrow = render_summary("my-application-with-a-longer-name", false, 32, true);
+        assert!(narrow.starts_with("  Application created\n"));
+        assert!(narrow.contains("cd my-application-with-a-longer-name"));
+        assert!(!narrow.contains('│'));
     }
 }

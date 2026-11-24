@@ -9,6 +9,13 @@ mod windows;
 
 #[cfg(unix)]
 pub use unix::{Key, RawMode, install_panic_hook, read_keys};
+#[cfg(windows)]
+pub use windows::{enable_ansi, supports_ansi};
+
+#[cfg(not(windows))]
+pub fn supports_ansi() -> bool {
+    io::stdout().is_terminal()
+}
 
 /// Determine whether both standard input and output are terminals.
 pub fn is_interactive() -> bool {
