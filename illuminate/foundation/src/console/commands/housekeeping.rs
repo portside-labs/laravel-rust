@@ -1,5 +1,7 @@
 //! `storage:unlink`, `auth:clear-resets`, and `package:discover`.
 
+use std::path::Path;
+
 use illuminate_console::{Command, Console, async_trait};
 use illuminate_support::{Result, Value};
 
@@ -22,20 +24,62 @@ impl Command for StorageUnlinkCommand {
     async fn handle(&self, cmd: Console) -> Result<()> {
         let app = Application::current();
         let links: Vec<String> = match app.config_repository().get("filesystems.links") {
-            Value::Object(map) if !map.is_empty() => map.keys().cloned().collect(),
-            _ => vec![app.public_path("storage")],
+            Value::Object(map) => map.keys().cloned().collect(),
+            Value::Null => vec![app.public_path("storage")],
+            _ => Vec::new(),
         };
 
         for link in links {
-            let path = std::path::Path::new(&link);
-            if !path.is_symlink() {
+            let path = Path::new(&link);
+            if !is_storage_symlink(path) {
                 continue;
             }
-            std::fs::remove_file(path)?;
-            cmd.components().info(format!("The [{link}] link has been deleted."));
+            // Laravel reports the link after attempting deletion, even when unlink fails.
+            let _ = std::fs::remove_file(path);
+            cmd.components()
+                .info(format!("The [{link}] link has been deleted."));
         }
         Ok(())
     }
+}
+
+#[cfg(not(windows))]
+fn is_storage_symlink(path: &Path) -> bool {
+    path.exists() && path.is_symlink()
+}
+
+#[cfg(windows)]
+fn is_storage_symlink(path: &Path) -> bool {
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_TAG_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        FileAttributeTagInfo, GetFileInformationByHandleEx,
+    };
+    use windows_sys::Win32::System::SystemServices::IO_REPARSE_TAG_SYMLINK;
+
+    // PHP's is_link() checks the reparse tag of the link itself.
+    let Ok(link) = OpenOptions::new()
+        .access_mode(0)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+    else {
+        return false;
+    };
+
+    let mut info = FILE_ATTRIBUTE_TAG_INFO::default();
+    // SAFETY: the handle stays open and the buffer is a writable FILE_ATTRIBUTE_TAG_INFO.
+    let found = unsafe {
+        GetFileInformationByHandleEx(
+            link.as_raw_handle(),
+            FileAttributeTagInfo,
+            std::ptr::from_mut(&mut info).cast(),
+            std::mem::size_of::<FILE_ATTRIBUTE_TAG_INFO>() as u32,
+        )
+    };
+    found != 0 && info.ReparseTag == IO_REPARSE_TAG_SYMLINK
 }
 
 /// `auth:clear-resets` — Flush expired password reset tokens.
