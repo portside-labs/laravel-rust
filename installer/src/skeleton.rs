@@ -5,6 +5,7 @@ pub struct File {
     /// The path relative to the application's root, `/`-separated.
     pub path: &'static str,
     pub contents: &'static [u8],
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub executable: bool,
 }
 

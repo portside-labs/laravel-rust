@@ -63,6 +63,11 @@ https://github.com/portside-labs/laravel-rust laravel-installer`, which you
 can also run yourself. If you're working on the framework itself, install
 from your checkout instead: `cargo install --path installer`.
 
+On Windows, run the Cargo install command from PowerShell. The installer
+asks the same questions there using numbered choices and line input.
+Pass `--no-interaction` to create an application with the supplied options
+and defaults.
+
 The installer asks which database you'd like and whether to build your
 frontend assets, then copies the application skeleton (the
 [`skeleton`](../skeleton) directory, the equivalent of `laravel/laravel`),

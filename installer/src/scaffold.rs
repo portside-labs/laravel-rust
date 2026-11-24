@@ -102,7 +102,20 @@ pub fn validate_name(name: &str) -> Result<(), String> {
         return Err("The name must start with a letter".into());
     }
 
-    if RESERVED.contains(&crate_identifier(name).as_str()) {
+    let reserved = RESERVED.contains(&crate_identifier(name).as_str());
+    #[cfg(windows)]
+    let reserved = reserved
+        || matches!(
+            name.to_ascii_uppercase().as_bytes(),
+            b"CON"
+                | b"PRN"
+                | b"AUX"
+                | b"NUL"
+                | [b'C', b'O', b'M', b'1'..=b'9']
+                | [b'L', b'P', b'T', b'1'..=b'9']
+        );
+
+    if reserved {
         return Err(format!(
             "The name [{name}] is reserved. Please choose another name"
         ));
@@ -578,6 +591,17 @@ debug = 1
         }
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn windows_device_names_are_rejected() {
+        for name in ["NUL", "con", "PrN", "aux", "COM1", "com9", "Lpt1", "LPT9"] {
+            assert!(validate_name(name).unwrap_err().contains("is reserved"));
+        }
+        for name in ["console", "COM10", "LPT10", "nul-app"] {
+            assert_eq!(validate_name(name), Ok(()));
+        }
+    }
+
     #[test]
     fn crate_identifiers_use_underscores() {
         assert_eq!(crate_identifier("podcasts"), "podcasts");
@@ -615,10 +639,11 @@ debug = 1
                 .contains("tokio = { version = \"1\", features = [\"full\", \"test-util\"] }\n")
         );
         assert!(manifest.contains("log = \"0.4\"\n"));
-        assert!(
-            manifest
-                .contains("laravel-build = { path = \"/code/laravel-rust/illuminate/build\" }\n")
-        );
+        let build = Path::new("/code/laravel-rust").join("illuminate/build");
+        assert!(manifest.contains(&format!(
+            "laravel-build = {{ path = {} }}\n",
+            crate::toml::quote(&build.to_string_lossy()),
+        )));
         assert!(manifest.ends_with("\n[profile.dev]\n# Keep debug builds snappy.\ndebug = 1\n"));
         assert!(!manifest.contains("workspace"));
 

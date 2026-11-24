@@ -87,7 +87,7 @@ const NEW_OPTIONS: &[OptionHelp] = &[
         short: None,
         long: "npm",
         value: None,
-        description: "Install and build NPM dependencies",
+        description: "Install and build npm dependencies, including with --no-interaction",
     },
     OptionHelp {
         short: None,

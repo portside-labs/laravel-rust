@@ -24,15 +24,18 @@ mod skeleton;
 mod terminal;
 mod toml;
 
-use std::io::IsTerminal;
+use std::process::ExitCode;
 
 use cli::Command;
 
-fn main() {
+fn main() -> ExitCode {
+    #[cfg(unix)]
     terminal::install_panic_hook();
+    #[cfg(windows)]
+    let _console = terminal::enable_ansi();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    std::process::exit(run(&arguments));
+    ExitCode::from(run(&arguments) as u8)
 }
 
 /// Decide whether to use colors: `--ansi` / `--no-ansi`, then `NO_COLOR` /
@@ -46,7 +49,7 @@ fn use_colors(ansi: Option<bool>) -> bool {
         {
             true
         } else {
-            std::io::stdout().is_terminal()
+            terminal::supports_ansi()
         }
     })
 }

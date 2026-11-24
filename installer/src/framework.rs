@@ -127,7 +127,11 @@ mod tests {
             local.dependency("illuminate/build"),
             [(
                 "path".to_string(),
-                r#""/code/laravel-rust/illuminate/build""#.to_string()
+                quote(
+                    &Path::new("/code/laravel-rust")
+                        .join("illuminate/build")
+                        .to_string_lossy()
+                )
             )]
         );
 
