@@ -493,7 +493,7 @@ impl Filesystem {
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or(Path::new("."));
         let mut temporary = tempfile::Builder::new()
-            .prefix(&format!(".{}", self.basename(&path)))
+            .prefix(".laravel-replace-")
             .tempfile_in(directory)?;
         temporary.write_all(contents.as_ref())?;
         #[cfg(unix)]
@@ -1293,6 +1293,16 @@ mod tests {
 
         files.put_locked(&path, "Locked").await.unwrap();
         assert_eq!(files.get(&path).await.unwrap(), "Locked");
+    }
+
+    #[tokio::test]
+    async fn replace_creates_a_missing_file() {
+        let dir = temp();
+        let files = Filesystem::new();
+        let path = dir.path().join("file.txt");
+
+        files.replace(&path, "Created").await.unwrap();
+        assert_eq!(files.get(&path).await.unwrap(), "Created");
     }
 
     #[tokio::test]
