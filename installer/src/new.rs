@@ -2,12 +2,12 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
 
 use crate::cli::NewOptions;
 use crate::framework::Framework;
-use crate::output::{self, bold, gray, link};
+use crate::output::{self, AssetSetup, bold, gray, link};
 use crate::prompts::{self, Cancelled};
 use crate::scaffold::{self, Blueprint, DATABASES};
 
@@ -106,7 +106,7 @@ pub fn run(options: NewOptions, interactive: bool) -> Result<(), Failure> {
             ),
             true,
         )?,
-        None => true,
+        None => false,
     };
 
     output::info(&format!("Creating a \"{name}\" application in [./{name}]"));
@@ -129,14 +129,20 @@ pub fn run(options: NewOptions, interactive: bool) -> Result<(), Failure> {
     })
     .map_err(|error| format!("Unable to create the environment file: {error}"))?;
 
-    let assets_ready = !npm || install_npm_dependencies(&directory);
+    let assets = if !npm {
+        AssetSetup::Skipped
+    } else if install_npm_dependencies(&directory, interactive) {
+        AssetSetup::Installed
+    } else {
+        AssetSetup::Failed
+    };
 
-    let built = build(&directory, &name, driver);
+    let built = build(&directory, &name, driver, interactive);
 
     // `key:generate` normally sets the key; make sure there is one either way.
     let _ = scaffold::ensure_app_key(&directory);
     let app_configured = built?;
-    output::application_summary(&name, assets_ready && app_configured);
+    output::application_summary(&name, app_configured, assets);
     output::line(&format!(
         "  {}",
         link("Documentation", "https://laravel.com/docs")
@@ -191,11 +197,12 @@ fn remove(directory: &Path) -> Result<(), String> {
     removed.map_err(|error| format!("Unable to remove [{}]: {error}", directory.display()))
 }
 
-/// Run a command with the terminal handed over to it and report its result.
+/// Run a command, giving it terminal input only during an interactive install.
 fn execute(
     description: &str,
     display: &str,
     command: &mut Command,
+    interactive: bool,
 ) -> Result<bool, std::io::Error> {
     output::write(&format!(
         "{}  {}\n",
@@ -203,6 +210,9 @@ fn execute(
         bold(description)
     ));
     output::line(&format!("  {}", gray(format!("> {display}"))));
+    if !interactive {
+        command.stdin(Stdio::null());
+    }
     let started = Instant::now();
     let result = command.status().map(|status| status.success());
     output::assume_new_lines(1);
@@ -226,7 +236,7 @@ fn find_npm(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
 }
 
 /// `npm install` and `npm run build`.
-fn install_npm_dependencies(directory: &Path) -> bool {
+fn install_npm_dependencies(directory: &Path, interactive: bool) -> bool {
     let path = std::env::var_os("PATH").unwrap_or_default();
     let Some(npm) = find_npm(std::env::split_paths(&path)) else {
         output::warn("Unable to find [npm]. Skipping [npm install] and [npm run build]");
@@ -249,6 +259,7 @@ fn install_npm_dependencies(directory: &Path) -> bool {
             description,
             display,
             Command::new(&npm).args(arguments).current_dir(directory),
+            interactive,
         );
         match succeeded {
             Ok(true) => {}
@@ -273,7 +284,7 @@ fn cargo() -> OsString {
 }
 
 /// Build the application, then set its key and (for SQLite) migrate.
-fn build(directory: &Path, name: &str, database: &str) -> Result<bool, String> {
+fn build(directory: &Path, name: &str, database: &str, interactive: bool) -> Result<bool, String> {
     let (color, ansi) = if output::colors() {
         ("--color=always", "--ansi")
     } else {
@@ -286,6 +297,7 @@ fn build(directory: &Path, name: &str, database: &str) -> Result<bool, String> {
         Command::new(cargo())
             .args(["build", "--bin", "artisan", color])
             .current_dir(directory),
+        interactive,
     );
     match built {
         Ok(true) => {}
@@ -301,13 +313,17 @@ fn build(directory: &Path, name: &str, database: &str) -> Result<bool, String> {
         }
     }
 
-    let mut commands = vec![("Generating the application key", ["key:generate", ansi])];
+    let mut commands = vec![("Generating the application key", "key:generate")];
     if database == "sqlite" {
-        commands.push(("Running SQLite migrations", ["migrate", ansi]));
+        commands.push(("Running SQLite migrations", "migrate"));
     }
 
     let mut configured = true;
-    for (description, arguments) in commands {
+    for (description, artisan) in commands {
+        let mut arguments = vec![artisan, ansi];
+        if !interactive {
+            arguments.push("--no-interaction");
+        }
         let display = format!("cargo artisan {}", arguments.join(" "));
         let succeeded = execute(
             description,
@@ -316,6 +332,7 @@ fn build(directory: &Path, name: &str, database: &str) -> Result<bool, String> {
                 .args(["run", "--quiet", "--bin", "artisan", color, "--"])
                 .args(arguments)
                 .current_dir(directory),
+            interactive,
         );
         if !matches!(succeeded, Ok(true)) {
             configured = false;

@@ -171,26 +171,43 @@ fn render_banner(columns: usize, decorated: bool) -> String {
     banner
 }
 
+/// The outcome of setting up the application's frontend assets.
+pub enum AssetSetup {
+    /// npm installed the dependencies and built the assets.
+    Installed,
+    /// The installer left asset setup to the user.
+    Skipped,
+    /// An npm command failed or could not be run.
+    Failed,
+}
+
 /// Show the new application's location and the commands to start it.
-pub fn application_summary(name: &str, complete: bool) {
+pub fn application_summary(name: &str, configured: bool, assets: AssetSetup) {
     write(&format!(
         "{}{}\n",
         margin_top(),
-        render_summary(name, complete, terminal::width(), colors())
+        render_summary(name, configured, assets, terminal::width(), colors())
     ));
 }
 
-fn render_summary(name: &str, complete: bool, columns: usize, decorated: bool) -> String {
+fn render_summary(
+    name: &str,
+    configured: bool,
+    assets: AssetSetup,
+    columns: usize,
+    decorated: bool,
+) -> String {
+    let complete = configured && !matches!(assets, AssetSetup::Failed);
     let title = if complete {
         "Application ready"
     } else {
         "Application created"
     };
-    let details = [
-        format!("Path  ./{name}"),
-        format!("cd {name}"),
-        "cargo artisan dev".into(),
-    ];
+    let mut details = vec![format!("Path  ./{name}"), format!("cd {name}")];
+    if !matches!(assets, AssetSetup::Installed) {
+        details.extend(["npm install".into(), "npm run build".into()]);
+    }
+    details.push("cargo artisan dev".into());
     let length = |text: &str| text.chars().count();
     let width = details
         .iter()
@@ -348,7 +365,7 @@ mod tests {
 
     #[test]
     fn the_summary_keeps_commands_readable_in_each_layout() {
-        let wide = render_summary("podcasts", true, 80, true);
+        let wide = render_summary("podcasts", true, AssetSetup::Installed, 80, true);
         assert!(wide.starts_with("  ┌ Application ready "));
         assert!(wide.contains("cd podcasts"));
         assert!(wide.contains("cargo artisan dev"));
@@ -357,7 +374,13 @@ mod tests {
                 .all(|line| line.chars().count() == wide.lines().next().unwrap().chars().count())
         );
 
-        let narrow = render_summary("my-application-with-a-longer-name", false, 32, true);
+        let narrow = render_summary(
+            "my-application-with-a-longer-name",
+            false,
+            AssetSetup::Skipped,
+            32,
+            true,
+        );
         assert!(narrow.starts_with("  Application created\n"));
         assert!(narrow.contains("cd my-application-with-a-longer-name"));
         assert!(!narrow.contains('│'));
