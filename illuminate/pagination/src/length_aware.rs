@@ -40,7 +40,7 @@ impl<T> LengthAwarePaginator<T> {
             current_page: current_page.max(1),
             last_page,
             on_each_side: 3,
-            options,
+            options: options.with_trimmed_path(),
         }
     }
 
