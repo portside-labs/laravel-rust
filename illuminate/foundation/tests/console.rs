@@ -366,18 +366,121 @@ async fn more_classes_can_be_generated() {
 }
 
 #[tokio::test]
-async fn storage_links_can_be_removed() {
+async fn storage_unlink_matches_laravel_for_directory_symlinks() {
     let (app, dir) = test_app();
+    let target = dir.path().join("storage/app/public");
+    let file = target.join("nested/keep.txt");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, "Keep this file").unwrap();
 
     app.artisan("storage:link").assert_successful().await;
     let link = dir.path().join("public/storage");
     assert!(link.is_symlink());
+    assert_eq!(
+        std::fs::read_to_string(link.join("nested/keep.txt")).unwrap(),
+        "Keep this file"
+    );
 
     app.artisan("storage:unlink")
         .expects_output_to_contain("link has been deleted.")
         .assert_successful()
         .await;
-    assert!(!link.exists() && !link.is_symlink());
+
+    // Laravel reports success on Windows even if unlink cannot remove a directory symlink.
+    assert_eq!(link.is_symlink(), cfg!(windows));
+    assert_eq!(link.exists(), cfg!(windows));
+    assert!(target.is_dir());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "Keep this file");
+}
+
+#[tokio::test]
+async fn storage_unlink_leaves_real_directories_alone() {
+    let (app, dir) = test_app();
+    let link = dir.path().join("public/storage");
+    let file = link.join("keep.txt");
+    std::fs::create_dir_all(&link).unwrap();
+    std::fs::write(&file, "Keep this file").unwrap();
+
+    app.artisan("storage:unlink")
+        .doesnt_expect_any_output()
+        .assert_successful()
+        .await;
+
+    assert!(link.is_dir());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "Keep this file");
+}
+
+#[tokio::test]
+async fn storage_unlink_removes_file_symlinks_when_configured() {
+    let (app, dir) = test_app();
+    let link = dir.path().join("public/storage");
+    let file = dir.path().join("keep.txt");
+    std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::fs::write(&file, "Keep this file").unwrap();
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&file, &link).unwrap();
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(&file, &link).unwrap();
+
+    app.app()
+        .override_config("filesystems.links", illuminate_support::json!({}));
+    app.artisan("storage:unlink")
+        .doesnt_expect_any_output()
+        .assert_successful()
+        .await;
+    assert!(link.is_symlink());
+
+    app.app().override_config(
+        "filesystems.links",
+        illuminate_support::json!({ (link.to_string_lossy()): file.to_string_lossy() }),
+    );
+    app.artisan("storage:unlink")
+        .expects_output_to_contain("link has been deleted.")
+        .assert_successful()
+        .await;
+    assert!(!link.is_symlink());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "Keep this file");
+
+    app.artisan("storage:unlink")
+        .doesnt_expect_any_output()
+        .assert_successful()
+        .await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn storage_unlink_skips_windows_junctions() {
+    let (app, dir) = test_app();
+    let link = dir.path().join("public").join("storage");
+    let target = dir.path().join("storage").join("app").join("public");
+    let file = target.join("keep.txt");
+    std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(&target).unwrap();
+    std::fs::write(&file, "Keep this file").unwrap();
+
+    let result = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(&link)
+        .arg(&target)
+        .output()
+        .unwrap();
+    assert!(result.status.success(), "{:?}", result);
+    assert_eq!(
+        std::fs::read_to_string(link.join("keep.txt")).unwrap(),
+        "Keep this file"
+    );
+
+    app.artisan("storage:unlink")
+        .doesnt_expect_any_output()
+        .assert_successful()
+        .await;
+
+    assert_eq!(
+        std::fs::read_to_string(link.join("keep.txt")).unwrap(),
+        "Keep this file"
+    );
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "Keep this file");
 }
 
 #[tokio::test]
