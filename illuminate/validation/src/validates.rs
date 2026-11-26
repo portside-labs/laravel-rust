@@ -1079,9 +1079,14 @@ impl Validator {
                 strict_eq(v, self.other(&p[0]))
             }
             "String" => v.is_string(),
-            "Timezone" => v
-                .as_str()
-                .is_some_and(|s| formats::is_timezone(s, p.first().map(String::as_str))),
+            "Timezone" => {
+                let group = p.first().map(String::as_str);
+                if group.is_some_and(|group| group.trim().eq_ignore_ascii_case("per_country")) {
+                    formats::is_timezone_for_country(v.as_str(), p.get(1).map(String::as_str))?
+                } else {
+                    v.as_str().is_some_and(|s| formats::is_timezone(s, group))
+                }
+            }
             "Url" => v.as_str().is_some_and(|s| formats::is_url(s, p)),
             "Ulid" => v.as_str().is_some_and(formats::is_ulid),
             "Uuid" => v.as_str().is_some_and(|s| {

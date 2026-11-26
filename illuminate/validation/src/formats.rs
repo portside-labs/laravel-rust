@@ -1,10 +1,12 @@
 //! Format checks used by the string rules: e-mail addresses, URLs, IP and
 //! MAC addresses, UUIDs, timezones, and PHP-style regular expressions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, LazyLock, Mutex};
 
+use illuminate_support::Result;
+use illuminate_support::error::InvalidArgumentException;
 use regex::Regex;
 
 // ----------------------------------------------------------------------
@@ -264,7 +266,38 @@ pub(crate) fn is_ulid(value: &str) -> bool {
         && ulid::Ulid::from_string(value).is_ok()
 }
 
-/// `in_array($value, timezone_identifiers_list($group, $country), true)`.
+// IANA tzdb 2025b zone.tab, the single-country table used by PHP.
+static COUNTRY_TIMEZONES: LazyLock<HashSet<(&str, &str)>> = LazyLock::new(|| {
+    include_str!("../data/zone.tab")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| {
+            let mut columns = line.split('\t');
+            let country = columns.next()?;
+            let _coordinates = columns.next()?;
+            let timezone = columns.next()?;
+            Some((country, timezone))
+        })
+        .collect()
+});
+
+/// Validate a timezone using the identifiers assigned to the requested country.
+pub(crate) fn is_timezone_for_country(value: Option<&str>, country: Option<&str>) -> Result<bool> {
+    let country = country
+        .map(str::to_uppercase)
+        .filter(|country| country.len() == 2)
+        .ok_or_else(|| {
+            InvalidArgumentException::new(
+                "timezone_identifiers_list(): Argument #2 ($countryCode) must be a \
+                 two-letter ISO 3166-1 compatible country code when argument #1 \
+                 ($timezoneGroup) is DateTimeZone::PER_COUNTRY",
+            )
+        })?;
+
+    Ok(value.is_some_and(|value| COUNTRY_TIMEZONES.contains(&(country.as_str(), value))))
+}
+
+/// Match a timezone identifier in a built-in region.
 pub(crate) fn is_timezone(value: &str, group: Option<&str>) -> bool {
     let Ok(tz) = value.parse::<chrono_tz::Tz>() else {
         return false;
@@ -289,7 +322,7 @@ pub(crate) fn is_timezone(value: &str, group: Option<&str>) -> bool {
     match group.map(|g| g.trim().to_ascii_uppercase()) {
         None => canonical,
         Some(group) => match group.as_str() {
-            "ALL" | "PER_COUNTRY" | "" => canonical,
+            "ALL" | "" => canonical,
             "ALL_WITH_BC" => true,
             "UTC" => name == "UTC",
             region => {
