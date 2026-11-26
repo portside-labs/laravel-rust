@@ -1113,6 +1113,43 @@ async fn timezone() {
 }
 
 #[tokio::test]
+async fn timezone_per_country() {
+    let _c = container();
+
+    ok(json!("Asia/Riyadh"), "timezone:per_country,sa").await;
+    assert_fails(
+        json!({"field": "Asia/Tokyo"}),
+        "timezone:per_country,SA",
+        "The field field must be a valid timezone.",
+    )
+    .await;
+    ok(json!("Asia/Tokyo"), "timezone:PER_COUNTRY,JP").await;
+    ok(json!("America/New_York"), "timezone:per_country,US").await;
+    ok(json!("Pacific/Honolulu"), "timezone:per_country,US").await;
+    bad(json!("America/Toronto"), "timezone:per_country,US").await;
+    bad(json!("US/Eastern"), "timezone:per_country,US").await;
+    bad(json!("UTC"), "timezone:per_country,SA").await;
+    bad(json!("Asia/Riyadh"), "timezone:per_country,ZZ").await;
+}
+
+#[tokio::test]
+async fn timezone_per_country_requires_a_two_letter_code() {
+    let _c = container();
+
+    for rule in ["timezone:per_country", "timezone:per_country,SAU"] {
+        let mut validator = illuminate_validation::Validator::make(
+            json!({"field": "Asia/Riyadh"}),
+            [("field", rule)],
+        );
+        let error = validator.try_passes().await.unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "timezone_identifiers_list(): Argument #2 ($countryCode) must be a two-letter ISO 3166-1 compatible country code when argument #1 ($timezoneGroup) is DateTimeZone::PER_COUNTRY"
+        );
+    }
+}
+
+#[tokio::test]
 async fn url() {
     let _c = container();
     ok(json!("https://laravel.com"), "url").await;
